@@ -108,16 +108,28 @@ class OpenFile(bpy.types.Operator):
     filename=os.path.join(xml_path,xmlRoot.get('structure'))
     bpy.ops.import_scene.obj(filepath=filename)
     obs = bpy.context.selected_editable_objects[:] 
-    bpy.context.scene.objects.active=obs[0]
+    #bpy.context.scene.objects.active=obs[0]
+    bpy.context.view_layer.objects.active=obs[0]
     bpy.ops.object.join()
     obs[0].name=xmlRoot.get('name')
     obs[0].dimensions=obs[0].dimensions*scale
     obs[0].location=(0.0, 0.0, 0.0)
     bpy.ops.object.shade_flat()
-    bpy.context.active_object.layers[0]= True
-    bpy.context.active_object.layers[1]= False
-    bpy.context.active_object.layers[2]= False
-    bpy.context.active_object.layers[3]= False
+    collection0 = bpy.data.collections.new(name="Structure") # create Home structure
+    collection1 = bpy.data.collections.new(name="DoorsOrWindows") # create doorOrWindow
+    collection2 = bpy.data.collections.new(name="Furnitures") # create pieceOfFurniture
+    collection3 = bpy.data.collections.new(name="Lights") # create new one
+    
+    context.scene.collection.children.link(collection0)
+    context.scene.collection.children.link(collection1)
+    context.scene.collection.children.link(collection2)
+    context.scene.collection.children.link(collection3)
+    
+    collection0.objects.link(obs[0]) # Home structure
+    #bpy.context.active_object.layers[0]= True
+    #bpy.context.active_object.layers[1]= False
+    #bpy.context.active_object.layers[2]= False
+    #bpy.context.active_object.layers[3]= False
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
@@ -158,22 +170,25 @@ class OpenFile(bpy.types.Operator):
         
         bpy.ops.import_scene.obj(filepath=filename)
         obs = bpy.context.selected_editable_objects[:] 
-        bpy.context.scene.objects.active=obs[0]
+        #bpy.context.scene.objects.active=obs[0]
+        bpy.context.view_layer.objects.active=obs[0]
         bpy.ops.object.join()
         obs[0].name=element.get('name')
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')     
         if objectName in ('doorOrWindow'):   
-           bpy.context.active_object.layers[1]= True  
-           bpy.context.active_object.layers[2]= False        
+#           bpy.context.active_object.layers[1]= True  
+#           bpy.context.active_object.layers[2]= False
+           collection1.objects.link(obs[0])        
         else:
-           bpy.context.active_object.layers[2]= True
-           bpy.context.active_object.layers[1]= False
-        bpy.context.active_object.layers[0]= False
-        bpy.context.active_object.layers[3]= False
+           #bpy.context.active_object.layers[2]= True
+           #bpy.context.active_object.layers[1]= False
+           collection2.objects.link(obs[0])
+        #bpy.context.active_object.layers[0]= False
+        #bpy.context.active_object.layers[3]= False
         
         if 'modelMirrored' in element.keys():
           if element.get('modelMirrored') == 'true':
-            bpy.ops.transform.mirror(constraint_axis=(True, False, False),constraint_orientation='GLOBAL', proportional='DISABLED')
+            bpy.ops.transform.mirror(constraint_axis=(True, False, False),orient_type='GLOBAL', use_proportional_edit=False)
       
         if 'modelRotation' in element.keys():
           value=element.get('modelRotation')
@@ -217,13 +232,13 @@ class OpenFile(bpy.types.Operator):
           r=int(color[2:4],16)/255.0
           g=int(color[4:6],16)/255.0
           b=int(color[6:8],16)/255.0
-          bcolor=[r,g,b]
+          bcolor=[r,g,b,0]
           for material in bpy.context.active_object.data.materials:
             material.diffuse_color=bcolor
   
         #search for texture or materials
         for prop in element:
-          if prop.tag == 'texture':
+          if prop.tag == 'texture' and False:
               image=prop.get('image')
               for material in bpy.context.active_object.data.materials:
                   img = bpy.data.images.load(os.path.join(xml_path,image))
@@ -239,14 +254,14 @@ class OpenFile(bpy.types.Operator):
                 r=int(color[2:4],16)/255.0
                 g=int(color[4:6],16)/255.0
                 b=int(color[6:8],16)/255.0
-                bcolor=[r,g,b]
+                bcolor=[r,g,b,0]
                 for material in bpy.context.active_object.data.materials:
                   if mname in material.name: 
                     material.diffuse_color=bcolor
         
               #face texture of material
               for texture in prop:
-                if texture.tag == 'texture':  
+                if texture.tag == 'texture' and False:  
                   image=texture.get('image')
                   for material in bpy.context.active_object.data.materials:
                      if mname in material.name: 
@@ -262,9 +277,9 @@ class OpenFile(bpy.types.Operator):
        
         power= float(element.get('power'))       
   
-
+        # FIXME: Disabled for now
         for light in element:
-          if light.tag == 'lightSource':       
+          if light.tag == 'lightSource' and False:       
             color=light.get('color')
             r=int(color[2:4],16)/255.0
             g=int(color[4:6],16)/255.0
@@ -287,7 +302,8 @@ class OpenFile(bpy.types.Operator):
 
         
     #insert camera  
-      if objectName in ('observerCamera'): 
+     # FIXME: Disabled for now
+      if objectName in ('observerCamera') and False: 
        if element.get('attribute') == 'observerCamera':
         locX = float(element.get('x'))*scale
         locY = -float(element.get('y'))*scale
@@ -300,16 +316,17 @@ class OpenFile(bpy.types.Operator):
         bpy.ops.mesh.primitive_cube_add(location=(locX, locY, locZ-(170.0*scale/2.0)),rotation=(0.0,0.0,-yaw))
         
         obs = bpy.context.selected_editable_objects[:] 
-        bpy.context.scene.objects.active=obs[0]
+        #bpy.context.scene.objects.active=obs[0]
+        bpy.context.view_layer.objects.active=obs[0]
         obs[0].name='player'
         obs[0].dimensions=(40*scale,20*scale,170.0*scale)
         
         bpy.data.objects["Camera"].parent=bpy.data.objects["player"]
         bpy.data.objects["Camera"].location=(0.0,-30.0*scale,22*scale)
         
-        bpy.data.objects["player"].game.physics_type='CHARACTER'
-        bpy.data.objects["player"].game.use_collision_bounds=True
-        bpy.data.objects["player"].game.step_height=0.8
+        #bpy.data.objects["player"].game.physics_type='CHARACTER'
+        #bpy.data.objects["player"].game.use_collision_bounds=True
+        #bpy.data.objects["player"].game.step_height=0.8
         
         
         #add logic blocks
@@ -399,33 +416,20 @@ class OpenFile(bpy.types.Operator):
         cam.game.actuators[-1].mode='LOOK'
         cam.game.actuators[-1].sensitivity_x=0.0
         
-        
-    #Iterate over all members of the material struct and disable apha (to solve texture errors in blender game engine)
-    for item in bpy.data.materials:
-        if item.alpha == 1.0 :
-           item.use_transparency = False
-           item.use_transparent_shadows = True
-        else:
-           item.raytrace_mirror.use = True
-           item.raytrace_mirror.reflect_factor= 0.1  
-           item.diffuse_intensity= 0.01
- 
-           
-    #better collision detection      
-    bpy.data.scenes["Scene"].game_settings.physics_step_sub=5.0 
     
     #world settings
-    bpy.data.worlds["World"].light_settings.use_ambient_occlusion=True
-    bpy.data.worlds["World"].light_settings.ao_factor=0.01
-    bpy.data.worlds["World"].light_settings.use_environment_light=True
-    bpy.data.worlds["World"].light_settings.environment_energy=0.01
-    
-    bpy.data.scenes["Scene"].unit_settings.system='METRIC'
-    bpy.data.scenes["Scene"].unit_settings.scale_length=0.01/scale
-    bpy.data.scenes["Scene"].layers[0]=True
-    bpy.data.scenes["Scene"].layers[1]=True
-    bpy.data.scenes["Scene"].layers[2]=True
-    bpy.data.scenes["Scene"].layers[3]=True
+    if False:
+        bpy.data.worlds["World"].light_settings.use_ambient_occlusion=True
+        bpy.data.worlds["World"].light_settings.ao_factor=0.01
+        bpy.data.worlds["World"].light_settings.use_environment_light=True
+        bpy.data.worlds["World"].light_settings.environment_energy=0.01
+        
+        bpy.data.scenes["Scene"].unit_settings.system='METRIC'
+        bpy.data.scenes["Scene"].unit_settings.scale_length=0.01/scale
+        bpy.data.scenes["Scene"].layers[0]=True
+        bpy.data.scenes["Scene"].layers[1]=True
+        bpy.data.scenes["Scene"].layers[2]=True
+        bpy.data.scenes["Scene"].layers[3]=True
     
     return {'FINISHED'}
 
