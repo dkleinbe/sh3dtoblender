@@ -83,6 +83,11 @@ class OpenFile(bpy.types.Operator):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
 
+    #clear collections
+    colls = bpy.data.collections
+    for coll in colls:
+      bpy.data.collections.remove(coll)
+
     #clear images
     imgs = bpy.data.images
     for image in imgs:
@@ -104,17 +109,7 @@ class OpenFile(bpy.types.Operator):
     xmlPath = os.path.join(xml_path,'Home.xml')
     xmlRoot = ElementTree.parse(xmlPath).getroot()
 
-    #read house
-    filename=os.path.join(xml_path,xmlRoot.get('structure'))
-    bpy.ops.import_scene.obj(filepath=filename)
-    obs = bpy.context.selected_editable_objects[:] 
-    #bpy.context.scene.objects.active=obs[0]
-    bpy.context.view_layer.objects.active=obs[0]
-    bpy.ops.object.join()
-    obs[0].name=xmlRoot.get('name')
-    obs[0].dimensions=obs[0].dimensions*scale
-    obs[0].location=(0.0, 0.0, 0.0)
-    bpy.ops.object.shade_flat()
+    # Create collections
     collection0 = bpy.data.collections.new(name="Structure") # create Home structure
     collection1 = bpy.data.collections.new(name="DoorsOrWindows") # create doorOrWindow
     collection2 = bpy.data.collections.new(name="Furnitures") # create pieceOfFurniture
@@ -124,12 +119,20 @@ class OpenFile(bpy.types.Operator):
     context.scene.collection.children.link(collection1)
     context.scene.collection.children.link(collection2)
     context.scene.collection.children.link(collection3)
+    #read house
+    filename=os.path.join(xml_path,xmlRoot.get('structure'))
+    bpy.ops.import_scene.obj(filepath=filename)
+    obs = bpy.context.selected_editable_objects[:] 
+    
+    bpy.context.view_layer.objects.active=obs[0]
+    bpy.ops.object.join()
+    obs[0].name=xmlRoot.get('name')
+    obs[0].dimensions=obs[0].dimensions*scale
+    obs[0].location=(0.0, 0.0, 0.0)
+    bpy.ops.object.shade_flat()
+    
     
     collection0.objects.link(obs[0]) # Home structure
-    #bpy.context.active_object.layers[0]= True
-    #bpy.context.active_object.layers[1]= False
-    #bpy.context.active_object.layers[2]= False
-    #bpy.context.active_object.layers[3]= False
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
@@ -146,8 +149,7 @@ class OpenFile(bpy.types.Operator):
       
       #if objectName in ('doorOrWindow','pieceOfFurniture'):
       if 'model' in element.keys():  
-        print(objectName)   
-
+       
         filename=os.path.join(xml_path,unquote(element.get('model')))
         dimX = float(element.get('width'))
         dimY = float(element.get('height'))
@@ -169,32 +171,38 @@ class OpenFile(bpy.types.Operator):
           locZ= (dimY*scale/2.0)+lve  
         
         del obs[:]
-        if collection2.objects.find(element.get('name')) != -1:
-            #obs.append(bpy.data.objects.new("666", collection2.objects[element.get('name')].data))
-            obj = bpy.data.objects[element.get('name')].copy()
-            #collection2.objects.link(obj)
+        #
+        # search for element in the collection
+        # if exist create a linked copy
+        # else load the object
+        name = element.get('name')
+        if collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1:
+            obj = bpy.data.objects[name].copy()
             obs.append(obj)
         else:
             bpy.ops.import_scene.obj(filepath=filename)
             obs = bpy.context.selected_editable_objects[:] 
-            obs[0].name=element.get('name')
+            obs[0].name=name
         
-                    #bpy.context.scene.objects.active=obs[0]
             bpy.context.view_layer.objects.active=obs[0]
             bpy.ops.object.join()
             bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')     
             
         if objectName in ('doorOrWindow'):   
-#           bpy.context.active_object.layers[1]= True  
-#           bpy.context.active_object.layers[2]= False
-           collection1.objects.link(obs[0])        
+           collection1.objects.link(obs[0])      
+           # Remove object from all other collection  
+           for coll in obs[0].users_collection:
+             print("+ Collection name: " + coll.name)
+             if coll.name not in (collection1.name):
+               coll.objects.unlink(obs[0])
         else:
-           #bpy.context.active_object.layers[2]= True
-           #bpy.context.active_object.layers[1]= False
            collection2.objects.link(obs[0])
-        #bpy.context.active_object.layers[0]= False
-        #bpy.context.active_object.layers[3]= False
-        
+           # Remove object from all other collection
+           for coll in obs[0].users_collection:
+             print("+ Collection name: " + coll.name)
+             if coll.name not in (collection2.name):
+               coll.objects.unlink(obs[0])
+
         if 'modelMirrored' in element.keys():
           if element.get('modelMirrored') == 'true':
             bpy.ops.transform.mirror(constraint_axis=(True, False, False),orient_type='GLOBAL', use_proportional_edit=False)
