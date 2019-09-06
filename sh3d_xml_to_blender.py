@@ -62,7 +62,7 @@ class OpenFile(bpy.types.Operator):
       
     zip_name=self.filepath
 
-
+    obs = []
     #file paths ans zip extraction dirs
 
     zip_path = os.path.abspath(zip_name)
@@ -147,6 +147,7 @@ class OpenFile(bpy.types.Operator):
       #if objectName in ('doorOrWindow','pieceOfFurniture'):
       if 'model' in element.keys():  
         print(objectName)   
+
         filename=os.path.join(xml_path,unquote(element.get('model')))
         dimX = float(element.get('width'))
         dimY = float(element.get('height'))
@@ -166,15 +167,23 @@ class OpenFile(bpy.types.Operator):
           locZ= (dimY*scale/2.0)+(float(element.get('elevation'))*scale)+lve 
         else:    
           locZ= (dimY*scale/2.0)+lve  
-
         
-        bpy.ops.import_scene.obj(filepath=filename)
-        obs = bpy.context.selected_editable_objects[:] 
-        #bpy.context.scene.objects.active=obs[0]
-        bpy.context.view_layer.objects.active=obs[0]
-        bpy.ops.object.join()
-        obs[0].name=element.get('name')
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')     
+        del obs[:]
+        if collection2.objects.find(element.get('name')) != -1:
+            #obs.append(bpy.data.objects.new("666", collection2.objects[element.get('name')].data))
+            obj = bpy.data.objects[element.get('name')].copy()
+            #collection2.objects.link(obj)
+            obs.append(obj)
+        else:
+            bpy.ops.import_scene.obj(filepath=filename)
+            obs = bpy.context.selected_editable_objects[:] 
+            obs[0].name=element.get('name')
+        
+                    #bpy.context.scene.objects.active=obs[0]
+            bpy.context.view_layer.objects.active=obs[0]
+            bpy.ops.object.join()
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')     
+            
         if objectName in ('doorOrWindow'):   
 #           bpy.context.active_object.layers[1]= True  
 #           bpy.context.active_object.layers[2]= False
@@ -209,7 +218,7 @@ class OpenFile(bpy.types.Operator):
           ob = bpy.context.object   
           ob.matrix_world = mat_rot
          
-          bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+          #bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
           
           ob.rotation_euler=(math.pi/2,0.0,0.0)
          
@@ -221,7 +230,7 @@ class OpenFile(bpy.types.Operator):
         obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
         obs[0].location=(locX, locY, locZ)    
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+        #bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         
         if 'angle' in element.keys():
           angle = element.get('angle') 
