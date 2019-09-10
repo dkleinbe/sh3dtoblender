@@ -177,6 +177,7 @@ class OpenFile(bpy.types.Operator):
         # else load the object
         name = element.get('name')
         print("+ Importing: " + name)
+        # FIXME: a remettre en service
         if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) and False:
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
@@ -236,15 +237,12 @@ class OpenFile(bpy.types.Operator):
         #TODO    
         
         #object position and rotation 
-        print("+ dimmension1: ")
-        print(obs[0].dimensions)
-        print("+ scale1:")
-        print(obs[0].scale)
-        obs[0].scale[0] = dimX / obs[0].dimensions[0] * scale 
-        obs[0].scale[1] = dimY / obs[0].dimensions[1] * scale
-        obs[0].scale[2] = dimZ / obs[0].dimensions[2] * scale
         
-        #obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
+        #obs[0].scale[0] = dimX / obs[0].dimensions[0] * scale 
+        #obs[0].scale[1] = dimY / obs[0].dimensions[1] * scale
+        #obs[0].scale[2] = dimZ / obs[0].dimensions[2] * scale
+        
+        obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
         #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
         #obs[0].location=(locX, locY, locZ)    
         #bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
@@ -265,6 +263,7 @@ class OpenFile(bpy.types.Operator):
         print("+ matrix_world1")
         print(obs[0].matrix_world)
         # transform vertices to world space to compute correct height
+        #   FIXME: a faire seulement si elevation != 0 sinon height = dimY/2*scale
         wvertices = [obs[0].matrix_world @ mathutils.Vector(v.co) for v in obs[0].data.vertices]
         zmin = wvertices[0][2]
         zmax = wvertices[0][2]
@@ -279,7 +278,7 @@ class OpenFile(bpy.types.Operator):
         print("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
         print("+ scale: " + str(scale))
         print("+ height: " + str(height))
-
+        # FIXME: a cleaner
         if True: 
           if 'elevation' in element.keys():
             locZ= (height/2.0)+(float(element.get('elevation'))*scale)+lve 
