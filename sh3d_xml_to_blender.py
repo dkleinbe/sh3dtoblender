@@ -256,23 +256,25 @@ class OpenFile(bpy.types.Operator):
         if 'pitch' in element.keys():
           pitch = element.get('pitch') 
           obs[0].rotation_euler[0] += -float(pitch)
-
+        # update to get correct transform
         bpy.context.view_layer.update()
         print("+ dimmension2: ")
         print(obs[0].dimensions)
         print("+ scale2:")
         print(obs[0].scale)
-        print("matrix_world1")
+        print("+ matrix_world1")
         print(obs[0].matrix_world)
-        bbox_corners = [obs[0].matrix_world @ mathutils.Vector(corner) for corner in obs[0].bound_box]
-        zmin = bbox_corners[0][2]
-        zmax = bbox_corners[0][2]
-        for v in bbox_corners:
-          print(v)
+        # transform vertices to world space to compute correct height
+        wvertices = [obs[0].matrix_world @ mathutils.Vector(v.co) for v in obs[0].data.vertices]
+        zmin = wvertices[0][2]
+        zmax = wvertices[0][2]
+        for v in wvertices:
+          #print(v)
           if v[2] > zmax:
             zmax = v[2]
           if v[2] < zmin:
             zmin =  v[2]
+
         height = zmax - zmin
         print("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
         print("+ scale: " + str(scale))
