@@ -46,7 +46,7 @@ import mathutils
 import struct
 import shutil
 
-scale=0.05
+scale=0.01
 speed=0.5
 
 class OpenFile(bpy.types.Operator):
@@ -176,7 +176,8 @@ class OpenFile(bpy.types.Operator):
         # if exist create a linked copy
         # else load the object
         name = element.get('name')
-        if collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1:
+        print("+ Importing: " + name)
+        if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) and False:
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
         else:
@@ -226,7 +227,7 @@ class OpenFile(bpy.types.Operator):
           ob = bpy.context.object   
           ob.matrix_world = mat_rot
          
-          #bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+          bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
           
           ob.rotation_euler=(math.pi/2,0.0,0.0)
          
@@ -235,14 +236,55 @@ class OpenFile(bpy.types.Operator):
         #TODO    
         
         #object position and rotation 
-        obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
-        obs[0].location=(locX, locY, locZ)    
+        print("+ dimmension1: ")
+        print(obs[0].dimensions)
+        print("+ scale1:")
+        print(obs[0].scale)
+        obs[0].scale[0] = dimX / obs[0].dimensions[0] * scale 
+        obs[0].scale[1] = dimY / obs[0].dimensions[1] * scale
+        obs[0].scale[2] = dimZ / obs[0].dimensions[2] * scale
+        
+        #obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
+        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
+        #obs[0].location=(locX, locY, locZ)    
         #bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
         
         if 'angle' in element.keys():
           angle = element.get('angle') 
           obs[0].rotation_euler[2]=-float(angle)   
+
+        if 'pitch' in element.keys():
+          pitch = element.get('pitch') 
+          obs[0].rotation_euler[0] += -float(pitch)
+
+        bpy.context.view_layer.update()
+        print("+ dimmension2: ")
+        print(obs[0].dimensions)
+        print("+ scale2:")
+        print(obs[0].scale)
+        print("matrix_world1")
+        print(obs[0].matrix_world)
+        bbox_corners = [obs[0].matrix_world @ mathutils.Vector(corner) for corner in obs[0].bound_box]
+        zmin = bbox_corners[0][2]
+        zmax = bbox_corners[0][2]
+        for v in bbox_corners:
+          print(v)
+          if v[2] > zmax:
+            zmax = v[2]
+          if v[2] < zmin:
+            zmin =  v[2]
+        height = zmax - zmin
+        print("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
+        print("+ scale: " + str(scale))
+        print("+ height: " + str(height))
+
+        if True: 
+          if 'elevation' in element.keys():
+            locZ= (height/2.0)+(float(element.get('elevation'))*scale)+lve 
+          else:    
+            locZ= (height/2.0)+lve
+
+        obs[0].location=(locX, locY, locZ)
 
         if 'color' in element.keys():
           color = element.get('color') 
