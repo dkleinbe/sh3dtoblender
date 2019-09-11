@@ -152,8 +152,8 @@ class OpenFile(bpy.types.Operator):
        
         filename=os.path.join(xml_path,unquote(element.get('model')))
         dimX = float(element.get('width'))
-        dimY = float(element.get('height'))
-        dimZ = float(element.get('depth')) 
+        dimZ = float(element.get('height'))
+        dimY = float(element.get('depth')) 
         
         locX = float(element.get('x'))*scale
         locY = -float(element.get('y'))*scale
@@ -163,42 +163,48 @@ class OpenFile(bpy.types.Operator):
           for lv in levels:
             if lv.id == element.get('level'):
               lve=(lv.elev)*scale
-               
-           
 
-        
         del obs[:]
         #
         # search for element in the collection
         # if exist create a linked copy
         # else load the object
         name = element.get('name')
+        print("+==============================================")
         print("+ Importing: " + name)
         # FIXME: a remettre en service
-        if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) and False:
+        if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) :
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
+            print("+ instancing objet")
+            print(obs[0].rotation_euler)
         else:
+            print("+ loading object")
             bpy.ops.import_scene.obj(filepath=filename)
             obs = bpy.context.selected_editable_objects[:] 
             obs[0].name=name
         
             bpy.context.view_layer.objects.active=obs[0]
             bpy.ops.object.join()
-            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')     
-            
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
+            print(obs[0].rotation_euler)
+            print("+ applying rotation")   
+            bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+            print(obs[0].rotation_euler)
+        
+
         if objectName in ('doorOrWindow'):   
            collection1.objects.link(obs[0])      
            # Remove object from all other collection  
            for coll in obs[0].users_collection:
-             print("+ Collection name: " + coll.name)
+             
              if coll.name not in (collection1.name):
                coll.objects.unlink(obs[0])
         else:
            collection2.objects.link(obs[0])
            # Remove object from all other collection
            for coll in obs[0].users_collection:
-             print("+ Collection name: " + coll.name)
+             
              if coll.name not in (collection2.name):
                coll.objects.unlink(obs[0])
 
@@ -235,22 +241,24 @@ class OpenFile(bpy.types.Operator):
         
         #object position and rotation 
         
-        
+        # set dimmensions
         obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
-        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
-        #obs[0].location=(locX, locY, locZ)    
-        #bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
         
         if 'angle' in element.keys():
           angle = element.get('angle') 
-          obs[0].rotation_euler[2]=-float(angle)   
+          obs[0].rotation_euler[2] = -float(angle)
+        else:   
+          obs[0].rotation_euler[2] = 0.0
 
-        if 'pitch' in element.keys():
+        if 'pitch' in element.keys() :
           pitch = element.get('pitch') 
-          obs[0].rotation_euler[0] += -float(pitch)
+          obs[0].rotation_euler[0] = -float(pitch)
         
+          print(obs[0].rotation_euler)
           # update to get correct transform
           bpy.context.view_layer.update()
+          print(obs[0].rotation_euler)
           
           # transform vertices to world space to compute correct height
           #   a faire seulement si pitch != 0 sinon height = dimY/2*scale
@@ -267,9 +275,10 @@ class OpenFile(bpy.types.Operator):
           print("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
           print("+ scale: " + str(scale))
           print("+ height: " + str(height))
-          
+
         else:
-          height = dimY * scale
+          obs[0].rotation_euler[0] = 0.0
+          height = dimZ * scale
         
         # adjust Z value
         if 'elevation' in element.keys():
