@@ -58,6 +58,8 @@ class OpenFile(bpy.types.Operator):
  
   filepath = bpy.props.StringProperty(subtype="FILE_PATH")
 
+  
+
   def execute(self, context):
       
     zip_name=self.filepath
@@ -95,7 +97,7 @@ class OpenFile(bpy.types.Operator):
 
     #clear materials
     for material in bpy.data.materials:
-        material.user_clear();
+        material.user_clear()
         bpy.data.materials.remove(material)    
         
     #clear textures
@@ -114,11 +116,14 @@ class OpenFile(bpy.types.Operator):
     collection1 = bpy.data.collections.new(name="DoorsOrWindows") # create doorOrWindow
     collection2 = bpy.data.collections.new(name="Furnitures") # create pieceOfFurniture
     collection3 = bpy.data.collections.new(name="Lights") # create new one
-    
+    collections = {'Home' : bpy.data.collections.new(name="Home") }# create Home collection
+
     context.scene.collection.children.link(collection0)
     context.scene.collection.children.link(collection1)
     context.scene.collection.children.link(collection2)
     context.scene.collection.children.link(collection3)
+    context.scene.collection.children.link(collections["Home"])
+
     #read house
     filename=os.path.join(xml_path,xmlRoot.get('structure'))
     bpy.ops.import_scene.obj(filepath=filename)
@@ -172,12 +177,19 @@ class OpenFile(bpy.types.Operator):
         name = element.get('name')
         print("+==============================================")
         print("+ Importing: " + name)
-        # FIXME: a remettre en service
+        
         if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) :
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
-            print("+ instancing objet")
-            print(obs[0].rotation_euler)
+            
+            print("+ instancing object")
+            # Set active object
+            bpy.context.view_layer.active_layer_collection.collection.objects.link(obj)
+            obs[0].select_set(True)
+            bpy.context.view_layer.objects.active=obs[0]
+
+            print("+ Active type 1")
+            print(type(bpy.context.view_layer.objects.active))            
         else:
             print("+ loading object")
             bpy.ops.import_scene.obj(filepath=filename)
@@ -185,29 +197,30 @@ class OpenFile(bpy.types.Operator):
             obs[0].name=name
         
             bpy.context.view_layer.objects.active=obs[0]
+
+            print("+ Active type 2")
+            print(type(bpy.context.view_layer.objects.active))
+
             bpy.ops.object.join()
             bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
             print(obs[0].rotation_euler)
             print("+ applying rotation")   
             bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
             print(obs[0].rotation_euler)
-        
+
+        # Set active object
+        #bpy.context.view_layer.objects.active=obs[0]
+        # Remove object from all collection
+        #for coll in obs[0].users_collection:
+        #  coll.objects.unlink(obs[0])
 
         if objectName in ('doorOrWindow'):   
            collection1.objects.link(obs[0])      
-           # Remove object from all other collection  
-           for coll in obs[0].users_collection:
-             
-             if coll.name not in (collection1.name):
-               coll.objects.unlink(obs[0])
         else:
            collection2.objects.link(obs[0])
-           # Remove object from all other collection
-           for coll in obs[0].users_collection:
-             
-             if coll.name not in (collection2.name):
-               coll.objects.unlink(obs[0])
 
+        collections['Home'].objects.link(obs[0])
+        
         if 'modelMirrored' in element.keys():
           if element.get('modelMirrored') == 'true':
             bpy.ops.transform.mirror(constraint_axis=(True, False, False),orient_type='GLOBAL', use_proportional_edit=False)
@@ -317,7 +330,10 @@ class OpenFile(bpy.types.Operator):
                 g=int(color[4:6],16)/255.0
                 b=int(color[6:8],16)/255.0
                 bcolor=[r,g,b,0]
-                for material in bpy.context.active_object.data.materials:
+
+                print("+ material:color: ")
+            
+                for material in obs[0].data.materials:
                   if mname in material.name: 
                     material.diffuse_color=bcolor
         
