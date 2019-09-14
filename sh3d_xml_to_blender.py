@@ -112,19 +112,19 @@ class OpenFile(bpy.types.Operator):
     xmlRoot = ElementTree.parse(xmlPath).getroot()
 
     # Create collections
-    collection0 = bpy.data.collections.new(name="Structure") # create Home structure
-    collection1 = bpy.data.collections.new(name="DoorsOrWindows") # create doorOrWindow
-    collection2 = bpy.data.collections.new(name="Furnitures") # create pieceOfFurniture
-    collection3 = bpy.data.collections.new(name="Lights") # create new one
-    collections = {'Home' : bpy.data.collections.new(name="Home") }# create Home collection
+    collections = {
+      'home' : bpy.data.collections.new(name="Home"),
+      'structure' : bpy.data.collections.new(name="Structure"),
+      'doorOrWindow' : bpy.data.collections.new(name="DoorsOrWindows"),
+      'pieceOfFurniture' : bpy.data.collections.new(name="Furnitures"),
+      'light' : bpy.data.collections.new(name="Lights"),
+      } # create home collections
 
-    context.scene.collection.children.link(collection0)
-    context.scene.collection.children.link(collection1)
-    context.scene.collection.children.link(collection2)
-    context.scene.collection.children.link(collection3)
-    context.scene.collection.children.link(collections["Home"])
-
-    #read house
+    for collec in collections.values() :
+      context.scene.collection.children.link(collec)
+    #
+    # read house structure
+    #
     filename=os.path.join(xml_path,xmlRoot.get('structure'))
     bpy.ops.import_scene.obj(filepath=filename)
     obs = bpy.context.selected_editable_objects[:] 
@@ -136,8 +136,11 @@ class OpenFile(bpy.types.Operator):
     obs[0].location=(0.0, 0.0, 0.0)
     bpy.ops.object.shade_flat()
     
-    
-    collection0.objects.link(obs[0]) # Home structure
+    # Remove object from all collection
+    for coll in obs[0].users_collection:
+      coll.objects.unlink(obs[0])
+    collections['structure'].objects.link(obs[0]) # Home structure
+    collections['home'].objects.link(obs[0]) # Home structure
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
@@ -178,18 +181,11 @@ class OpenFile(bpy.types.Operator):
         print("+==============================================")
         print("+ Importing: " + name)
         
-        if (collection1.objects.find(name) != -1 or collection2.objects.find(name) != -1) :
+        if collections[objectName].objects.find(name) != -1 :
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
             
-            print("+ instancing object")
-            # Set active object
-            bpy.context.view_layer.active_layer_collection.collection.objects.link(obj)
-            obs[0].select_set(True)
-            bpy.context.view_layer.objects.active=obs[0]
-
-            print("+ Active type 1")
-            print(type(bpy.context.view_layer.objects.active))            
+            print("+ instancing object")         
         else:
             print("+ loading object")
             bpy.ops.import_scene.obj(filepath=filename)
@@ -198,8 +194,7 @@ class OpenFile(bpy.types.Operator):
         
             bpy.context.view_layer.objects.active=obs[0]
 
-            print("+ Active type 2")
-            print(type(bpy.context.view_layer.objects.active))
+
 
             bpy.ops.object.join()
             bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
@@ -208,19 +203,20 @@ class OpenFile(bpy.types.Operator):
             bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
             print(obs[0].rotation_euler)
 
-        # Set active object
-        #bpy.context.view_layer.objects.active=obs[0]
         # Remove object from all collection
-        #for coll in obs[0].users_collection:
-        #  coll.objects.unlink(obs[0])
+        for coll in obs[0].users_collection:
+          coll.objects.unlink(obs[0])
+        # Link object to collection
+        collections[objectName].objects.link(obs[0]) 
+        collections['home'].objects.link(obs[0])
+        # Set active object
+        #bpy.context.view_layer.active_layer_collection.collection.objects.link(obs[0])
+        #context.view_layer.active_layer_collection = collections['home']
+        #obs[0].select_set(True)
+        bpy.context.view_layer.objects.active=obs[0]  
+        print("+ Active type")
+        print(type(bpy.context.view_layer.objects.active))
 
-        if objectName in ('doorOrWindow'):   
-           collection1.objects.link(obs[0])      
-        else:
-           collection2.objects.link(obs[0])
-
-        collections['Home'].objects.link(obs[0])
-        
         if 'modelMirrored' in element.keys():
           if element.get('modelMirrored') == 'true':
             bpy.ops.transform.mirror(constraint_axis=(True, False, False),orient_type='GLOBAL', use_proportional_edit=False)
