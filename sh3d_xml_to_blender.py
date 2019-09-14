@@ -58,25 +58,22 @@ class OpenFile(bpy.types.Operator):
  
   filepath = bpy.props.StringProperty(subtype="FILE_PATH")
 
-  
-
   def execute(self, context):
       
     zip_name=self.filepath
 
-    obs = []
     #file paths ans zip extraction dirs
 
     zip_path = os.path.abspath(zip_name)
     zip_dir = os.path.dirname(zip_path)
-    xml_path=os.path.join(zip_dir, 'xml')
+    self.xml_path = os.path.join(zip_dir, 'xml')
 
     #remove old files
-    shutil.rmtree(xml_path,True)
+    shutil.rmtree(self.xml_path,True)
     
     #unzip files
     with ZipFile(zip_path, 'r') as zip_file:
-       zip_file.extractall(xml_path)
+       zip_file.extractall(self.xml_path)
 
 
     #clear scene
@@ -108,11 +105,11 @@ class OpenFile(bpy.types.Operator):
 
 
     #read xml and files
-    xmlPath = os.path.join(xml_path,'Home.xml')
+    xmlPath = os.path.join(self.xml_path,'Home.xml')
     xmlRoot = ElementTree.parse(xmlPath).getroot()
 
     # Create collections
-    collections = {
+    self.collections = {
       'home' : bpy.data.collections.new(name="Home"),
       'structure' : bpy.data.collections.new(name="Structure"),
       'doorOrWindow' : bpy.data.collections.new(name="DoorsOrWindows"),
@@ -120,12 +117,13 @@ class OpenFile(bpy.types.Operator):
       'light' : bpy.data.collections.new(name="Lights"),
       } # create home collections
 
-    for collec in collections.values() :
+    # link collections to scene
+    for collec in self.collections.values() :
       context.scene.collection.children.link(collec)
     #
     # read house structure
     #
-    filename=os.path.join(xml_path,xmlRoot.get('structure'))
+    filename=os.path.join(self.xml_path,xmlRoot.get('structure'))
     bpy.ops.import_scene.obj(filepath=filename)
     obs = bpy.context.selected_editable_objects[:] 
     
@@ -136,14 +134,23 @@ class OpenFile(bpy.types.Operator):
     obs[0].location=(0.0, 0.0, 0.0)
     bpy.ops.object.shade_flat()
     
-    # Remove object from all collection
+    # Remove structure from all collection
     for coll in obs[0].users_collection:
       coll.objects.unlink(obs[0])
-    collections['structure'].objects.link(obs[0]) # Home structure
-    collections['home'].objects.link(obs[0]) # Home structure
+    # add structure to collections
+    self.collections['structure'].objects.link(obs[0]) # Home structure
+    self.collections['home'].objects.link(obs[0]) # Home structure
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
+
+    self.LoadObjectTree(xmlRoot, self.collections['home'])
+
+    return {'FINISHED'}
+
+  def LoadObjectTree(self, xmlRoot, collection):
+
+    obs = []
 
     for element in xmlRoot:
       objectName = element.tag
@@ -151,14 +158,17 @@ class OpenFile(bpy.types.Operator):
       if objectName == 'level':
          levels.append(Level(id=element.get('id'),elev=float(element.get('elevation')),ft=float(element.get('floorThickness'))))
            
-      if objectName == 'furnitureGroup':       
-         for furniture in element:
-            xmlRoot.append(furniture);      
+      # recursive call
+      if objectName == 'furnitureGroup':
+
+        groupColl = bpy.data.collections.new(name=element.get('name'))
+        collection.children.link(groupColl)
+        self.LoadObjectTree(element, groupColl)
+         
       
-      #if objectName in ('doorOrWindow','pieceOfFurniture'):
-      if 'model' in element.keys():  
+      elif 'model' in element.keys():  
        
-        filename=os.path.join(xml_path,unquote(element.get('model')))
+        filename=os.path.join(self.xml_path,unquote(element.get('model')))
         dimX = float(element.get('width'))
         dimZ = float(element.get('height'))
         dimY = float(element.get('depth')) 
@@ -166,7 +176,7 @@ class OpenFile(bpy.types.Operator):
         locX = float(element.get('x'))*scale
         locY = -float(element.get('y'))*scale
         
-        lve=0.0;
+        lve=0.0
         if 'level' in element.keys():
           for lv in levels:
             if lv.id == element.get('level'):
@@ -181,7 +191,7 @@ class OpenFile(bpy.types.Operator):
         print("+==============================================")
         print("+ Importing: " + name)
         
-        if collections[objectName].objects.find(name) != -1 :
+        if self.collections[objectName].objects.find(name) != -1 :
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
             
@@ -207,8 +217,8 @@ class OpenFile(bpy.types.Operator):
         for coll in obs[0].users_collection:
           coll.objects.unlink(obs[0])
         # Link object to collection
-        collections[objectName].objects.link(obs[0]) 
-        collections['home'].objects.link(obs[0])
+        self.collections[objectName].objects.link(obs[0]) 
+        collection.objects.link(obs[0])
         # Set active object
         #bpy.context.view_layer.active_layer_collection.collection.objects.link(obs[0])
         #context.view_layer.active_layer_collection = collections['home']
@@ -312,7 +322,7 @@ class OpenFile(bpy.types.Operator):
           if prop.tag == 'texture' and False:
               image=prop.get('image')
               for material in bpy.context.active_object.data.materials:
-                  img = bpy.data.images.load(os.path.join(xml_path,image))
+                  img = bpy.data.images.load(os.path.join(self.xml_path,image))
                   tex = bpy.data.textures.new(image, type = 'IMAGE')
                   tex.image = img        
                   mtex = material.texture_slots.add()
@@ -339,7 +349,7 @@ class OpenFile(bpy.types.Operator):
                   image=texture.get('image')
                   for material in bpy.context.active_object.data.materials:
                      if mname in material.name: 
-                       img = bpy.data.images.load(os.path.join(xml_path,image))
+                       img = bpy.data.images.load(os.path.join(self.xml_path,image))
                        tex = bpy.data.textures.new(image, type = 'IMAGE')
                        tex.image = img        
                        mtex = material.texture_slots.add()
