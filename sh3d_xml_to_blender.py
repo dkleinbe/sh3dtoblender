@@ -58,6 +58,22 @@ class OpenFile(bpy.types.Operator):
  
   filepath = bpy.props.StringProperty(subtype="FILE_PATH")
 
+  #Recursivly transverse layer_collection for a particular name
+  def recurLayerCollection(layerColl, collName):
+    found = None
+    if (layerColl.name == collName):
+        return layerColl
+    for layer in layerColl.children:
+        found = recurLayerCollection(layer, collName)
+        if found:
+            return found
+
+  def setActiveCollection(collName) :
+    #Change the Active LayerCollection to 'Another Collection'
+    layer_collection = bpy.context.view_layer.layer_collection
+    layerColl = recurLayerCollection(layer_collection, 'Another Collection')
+    bpy.context.view_layer.active_layer_collection = layerColl
+
   def execute(self, context):
       
     zip_name=self.filepath
@@ -124,22 +140,24 @@ class OpenFile(bpy.types.Operator):
     # read house structure
     #
     filename=os.path.join(self.xml_path,xmlRoot.get('structure'))
-    bpy.ops.import_scene.obj(filepath=filename)
+    bpy.ops.import_scene.obj(filepath=filename, use_split_objects=True)
     obs = bpy.context.selected_editable_objects[:] 
     
     bpy.context.view_layer.objects.active=obs[0]
-    bpy.ops.object.join()
-    obs[0].name=xmlRoot.get('name')
-    obs[0].dimensions=obs[0].dimensions*scale
-    obs[0].location=(0.0, 0.0, 0.0)
-    bpy.ops.object.shade_flat()
-    
-    # Remove structure from all collection
-    for coll in obs[0].users_collection:
-      coll.objects.unlink(obs[0])
-    # add structure to collections
-    self.collections['structure'].objects.link(obs[0]) # Home structure
-    self.collections['home'].objects.link(obs[0]) # Home structure
+    #bpy.ops.object.join()
+    for o in obs:
+      bpy.context.view_layer.objects.active=o
+      #o.name=xmlRoot.get('name')
+      o.dimensions=o.dimensions*scale
+      o.location=(0.0, 0.0, 0.0)
+      bpy.ops.object.shade_flat()
+      
+      # Remove structure from all collection
+      for coll in o.users_collection:
+        coll.objects.unlink(o)
+      # add structure to collections
+      self.collections['structure'].objects.link(o) # Home structure
+      self.collections['home'].objects.link(o) # Home structure
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
@@ -191,7 +209,7 @@ class OpenFile(bpy.types.Operator):
         print("+==============================================")
         print("+ Importing: " + name)
         
-        if self.collections[objectName].objects.find(name) != -1 :
+        if self.collections[objectName].objects.find(name) != -1 and False:
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
             
@@ -207,7 +225,7 @@ class OpenFile(bpy.types.Operator):
 
 
             bpy.ops.object.join()
-            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
+            #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
             print(obs[0].rotation_euler)
             print("+ applying rotation")   
             bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
@@ -261,7 +279,7 @@ class OpenFile(bpy.types.Operator):
         #object position and rotation 
         
         # set dimmensions
-        obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)
+        obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)        
 
         
         if 'angle' in element.keys():
@@ -302,9 +320,15 @@ class OpenFile(bpy.types.Operator):
         # adjust Z value
         if 'elevation' in element.keys():
           locZ= (height/2.0)+(float(element.get('elevation'))*scale)+lve 
+          print("+ elevation: " + element.get('elevation'))
+          print("+ lve: " + str(lve))
+          print("+ locZ: " + str(locZ))
         else:    
           locZ= (height/2.0)+lve
  
+        # Apply rotation to get correct bound and center
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
         # set location
         obs[0].location=(locX, locY, locZ)
 
@@ -345,16 +369,20 @@ class OpenFile(bpy.types.Operator):
         
               #face texture of material
               for texture in prop:
-                if texture.tag == 'texture' and False:  
+                if texture.tag == 'texture' :  
                   image=texture.get('image')
                   for material in bpy.context.active_object.data.materials:
-                     if mname in material.name: 
-                       img = bpy.data.images.load(os.path.join(self.xml_path,image))
-                       tex = bpy.data.textures.new(image, type = 'IMAGE')
-                       tex.image = img        
-                       mtex = material.texture_slots.add()
-                       mtex.texture = tex  
-           
+                    if mname in material.name: 
+                      img = bpy.data.images.load(os.path.join(self.xml_path,image))
+                      
+                      material.use_nodes = True
+                      bsdf = material.node_tree.nodes["Principled BSDF"]
+                      #tex = bpy.data.textures.new(image, type = 'IMAGE')
+                      tex = material.node_tree.nodes.new('ShaderNodeTexImage')
+                      tex.image = img
+
+                      material.node_tree.links.new(bsdf.inputs['Base Color'], tex.outputs['Color'])
+                      
       
       if objectName in ('light'):   
         owner=bpy.context.active_object    
