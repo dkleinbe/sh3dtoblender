@@ -74,6 +74,28 @@ class OpenFile(bpy.types.Operator):
     layerColl = recurLayerCollection(layer_collection, 'Another Collection')
     bpy.context.view_layer.active_layer_collection = layerColl
 
+  def calcBounds(self, verts):
+    """Calculates the bounding box for selected vertices. Requires applied scale to work correctly. """
+
+    # [+x, -x, +y, -y, +z, -z]
+    v = verts[0]
+    bounds = [v[0], v[0], v[1], v[1], v[2], v[2]]
+
+    for v in verts:
+      if bounds[0] < v[0]:
+          bounds[0] = v[0]
+      if bounds[1] > v[0]:
+          bounds[1] = v[0]
+      if bounds[2] < v[1]:
+          bounds[2] = v[1]
+      if bounds[3] > v[1]:
+          bounds[3] = v[1]
+      if bounds[4] < v[2]:
+          bounds[4] = v[2]
+      if bounds[5] > v[2]:
+          bounds[5] = v[2]
+    return bounds
+
   def execute(self, context):
       
     zip_name=self.filepath
@@ -225,7 +247,7 @@ class OpenFile(bpy.types.Operator):
 
 
             bpy.ops.object.join()
-            #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
+            bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')  
             print(obs[0].rotation_euler)
             print("+ applying rotation")   
             bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
@@ -313,6 +335,15 @@ class OpenFile(bpy.types.Operator):
           print("+ scale: " + str(scale))
           print("+ height: " + str(height))
 
+          bounds = self.calcBounds(wvertices)
+          print("+ bounds:")
+          print(bounds)
+          delta_center = [
+            -bounds[0] - (bounds[1] - bounds[0]) / 2.0,
+            -bounds[2] - (bounds[3] - bounds[2]) / 2.0,
+            -bounds[4] - (bounds[5] - bounds[4]) / 2.0]
+          print(delta_center)
+
         else:
           obs[0].rotation_euler[0] = 0.0
           height = dimZ * scale
@@ -327,8 +358,9 @@ class OpenFile(bpy.types.Operator):
           locZ= (height/2.0)+lve
  
         # Apply rotation to get correct bound and center
-        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
+        #bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
+        
         # set location
         obs[0].location=(locX, locY, locZ)
 
