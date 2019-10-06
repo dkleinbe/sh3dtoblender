@@ -150,8 +150,9 @@ class OpenFile(bpy.types.Operator):
     #read xml and files
     xmlPath = os.path.join(self.xml_path,'Home.xml')
     xmlRoot = ElementTree.parse(xmlPath).getroot()
-
+    #
     # Create collections
+    #
     self.collections = {
       'home' : bpy.data.collections.new(name="Home"),
       'structure' : bpy.data.collections.new(name="Structure"),
@@ -159,16 +160,29 @@ class OpenFile(bpy.types.Operator):
       'pieceOfFurniture' : bpy.data.collections.new(name="Furnitures"),
       'light' : bpy.data.collections.new(name="Lights"),
       } # create home collections
-
+    
     # link collections to scene
+    # Home
+    #  | Structure
+    #  | DoorsOrWindows
+    #  | Furnitures
+    #  | Lights
+    #  | ... groups
+    #
     for collec in self.collections.values() :
-      context.scene.collection.children.link(collec)
+      if 'Home' in collec.name :
+        context.scene.collection.children.link(collec)
+      else :
+        self.collections['home'].children.link(collec)
+
     #
     # read house structure
     #
     filename=os.path.join(self.xml_path,xmlRoot.get('structure'))
     bpy.ops.import_scene.obj(filepath=filename, use_split_objects=True)
     obs = bpy.context.selected_editable_objects[:] 
+    # apply rotation
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=False)
     
     bpy.context.view_layer.objects.active=obs[0]
     #bpy.ops.object.join()
@@ -184,7 +198,7 @@ class OpenFile(bpy.types.Operator):
         coll.objects.unlink(o)
       # add structure to collections
       self.collections['structure'].objects.link(o) # Home structure
-      self.collections['home'].objects.link(o) # Home structure
+      #self.collections['home'].objects.link(o) # Home structure
 
     Level = namedtuple("Level", "id elev ft")
     levels=[]
@@ -208,12 +222,19 @@ class OpenFile(bpy.types.Operator):
 
       if objectName == 'level':
          levels.append(Level(id=element.get('id'),elev=float(element.get('elevation')),ft=float(element.get('floorThickness'))))
-           
-      # recursive call
+      #
+      # furniture group     
+      #
       if objectName == 'furnitureGroup':
 
         groupColl = bpy.data.collections.new(name=element.get('name'))
         collection.children.link(groupColl)
+        # TODO: manage visibility
+        if 'visible' in element.keys() and False :
+          if element.get('visible') == 'false': 
+            groupColl.hide_viewport = True
+
+        # recursive call to load children    
         self.LoadObjectTree(element, groupColl)
          
       
@@ -281,17 +302,25 @@ class OpenFile(bpy.types.Operator):
         for coll in obs[0].users_collection:
           coll.objects.unlink(obs[0])
         # Link object to collection
-        self.collections[objectName].objects.link(obs[0]) 
-        collection.objects.link(obs[0])
+        #
+        if 'Home' in collection.name :
+          self.collections[objectName].objects.link(obs[0]) 
+        else :
+          collection.objects.link(obs[0])
+
         # Set active object
-        #bpy.context.view_layer.active_layer_collection.collection.objects.link(obs[0])
-        #context.view_layer.active_layer_collection = collections['home']
         obs[0].select_set(True)
 
         bpy.context.view_layer.objects.active=obs[0]  
         logger.debug("+ Active type")
         logger.debug(type(bpy.context.view_layer.objects.active))
 
+        # 
+        # TODO: manage visibility
+        #
+        if 'visible' in element.keys() and False :
+          if element.get('visible') == 'false': 
+            obs[0].hide_viewport = True
         #
         # mirrored model
         #
