@@ -254,6 +254,7 @@ class OpenFile(bpy.types.Operator):
             logger.info('+ instancing object <%s>', name)      
 
         else:
+
             logger.info('+ loading object <%s>', filename)
 
             bpy.ops.import_scene.obj(filepath=filename)
@@ -291,23 +292,16 @@ class OpenFile(bpy.types.Operator):
         logger.debug("+ Active type")
         logger.debug(type(bpy.context.view_layer.objects.active))
 
+        #
+        # mirrored model
+        #
         if 'modelMirrored' in element.keys() :
           if element.get('modelMirrored') == 'true':
-            if 'Porte ouverte' in name : 
-              aze = bpy.data.objects['Porte ouverte']
-              logger.debug("+ Porte ouverte location 1")   
-              logger.debug("+ is slected: %s", aze.select_get())
-              logger.debug(aze.location)
-              logger.debug(obs[0].location)
 
             bpy.ops.transform.mirror(constraint_axis=(True, False, False),orient_type='GLOBAL', use_proportional_edit=False)
-
-            if 'Porte ouverte' in name : 
-              aze = bpy.data.objects['Porte ouverte']
-              logger.debug("+ Porte ouverte location 2")   
-              logger.debug(aze.location)
-              logger.debug(obs[0].location)
-
+        #
+        # rotated model
+        #
         if 'modelRotation' in element.keys():
           value=element.get('modelRotation')
           va=value.split()
@@ -329,10 +323,9 @@ class OpenFile(bpy.types.Operator):
          
           bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
           
-          ob.rotation_euler=(math.pi/2,0.0,0.0)
-         
-        
-        #if 'backFaceShown' in element.keys():
+          ob.rotation_euler=(math.pi/2,0.0,0.0)   
+        #  
+        # TODO: if 'backFaceShown' in element.keys():
         #TODO    
 
         #
@@ -340,19 +333,32 @@ class OpenFile(bpy.types.Operator):
         #
         obs[0].dimensions=(dimX*scale,dimY*scale,dimZ*scale)        
 
-        
+        # reset delta center
+        delta_center = [0.0, 0.0, 0.0]
+        fixCenter = False
+        #
+        # angle
+        #
         if 'angle' in element.keys():
           angle = element.get('angle') 
           obs[0].rotation_euler[2] = -float(angle)
+          fixCenter = True
         else:   
           obs[0].rotation_euler[2] = 0.0
-
-        delta_center = [0.0, 0.0, 0.0]
-        
+        #
+        # pitch
+        #
         if 'pitch' in element.keys() :
           pitch = element.get('pitch') 
           obs[0].rotation_euler[0] = -float(pitch)
-        
+          fixCenter = True
+        else:
+          obs[0].rotation_euler[0] = 0.0
+          height = dimZ * scale
+        #
+        # Compute correct height and new center with after angle and pitch rotation
+        #
+        if fixCenter :
           logger.debug(obs[0].rotation_euler)
           # update to get correct transform
           bpy.context.view_layer.update()
@@ -383,11 +389,9 @@ class OpenFile(bpy.types.Operator):
             -bounds[4] - (bounds[5] - bounds[4]) / 2.0]
           logger.debug(delta_center)
 
-        else:
-          obs[0].rotation_euler[0] = 0.0
-          height = dimZ * scale
-        
+        #
         # adjust Z value
+        #
         if 'elevation' in element.keys():
           locZ= (height/2.0)+(float(element.get('elevation'))*scale)+lve 
           logger.debug("+ elevation: " + element.get('elevation'))
@@ -396,17 +400,17 @@ class OpenFile(bpy.types.Operator):
         else:    
           locZ= (height/2.0)+lve
  
-        # Apply rotation to get correct bound and center
-        #bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY',center='BOUNDS')
         #
         # set location
         #
         logger.debug("+ location: " + str(locX) + " | " + str(locY) + " | " + str(locZ))
-        
-        obs[0].location=(locX + delta_center[0], locY + delta_center[1], locZ + delta_center[2])
-        logger.debug(obs[0].location)
 
+        obs[0].location=(locX + delta_center[0], locY + delta_center[1], locZ + delta_center[2])
+
+        logger.debug(obs[0].location)
+        #
+        # color
+        #
         if 'color' in element.keys():
           color = element.get('color') 
           r=int(color[2:4],16)/255.0
@@ -415,8 +419,9 @@ class OpenFile(bpy.types.Operator):
           bcolor=[r,g,b,0]
           for material in bpy.context.active_object.data.materials:
             material.diffuse_color=bcolor
-  
-        #search for texture or materials
+        #
+        # search for texture or materials
+        #
         for prop in element:
           if prop.tag == 'texture' and False:
               image=prop.get('image')
