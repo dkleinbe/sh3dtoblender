@@ -367,18 +367,6 @@ class OpenFile(bpy.types.Operator):
           # transform vertices to world space to compute correct height
           #   a faire seulement si pitch != 0 sinon height = dimY/2*scale
           wvertices = [obs[0].matrix_world @ mathutils.Vector(v.co) for v in obs[0].data.vertices]
-          zmin = wvertices[0][2]
-          zmax = wvertices[0][2]
-          for v in wvertices:
-            if v[2] > zmax:
-              zmax = v[2]
-            if v[2] < zmin:
-              zmin =  v[2]
-
-          height = zmax - zmin
-          logger.debug("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
-          logger.debug("+ scale: " + str(scale))
-          logger.debug("+ height: " + str(height))
 
           # get bounds in world space
           bounds = self.calcBounds(wvertices)
@@ -428,7 +416,7 @@ class OpenFile(bpy.types.Operator):
           r=int(color[2:4],16)/255.0
           g=int(color[4:6],16)/255.0
           b=int(color[6:8],16)/255.0
-          bcolor=[r,g,b,0]
+          bcolor=[r,g,b,1.0]
           for material in bpy.context.active_object.data.materials:
             material.diffuse_color=bcolor
         #
