@@ -380,9 +380,21 @@ class OpenFile(bpy.types.Operator):
           logger.debug("+ scale: " + str(scale))
           logger.debug("+ height: " + str(height))
 
+          # get bounds in world space
           bounds = self.calcBounds(wvertices)
           logger.debug("+ bounds:")
           logger.debug(bounds)
+
+          # get height
+          zmin = bounds[5]
+          zmax = bounds[4]
+          height = zmax - zmin
+
+          logger.debug("+ dimX: " + str(dimX) + " dimY: " + str(dimY) + " dimZ: " + str(dimZ))
+          logger.debug("+ scale: " + str(scale))
+          logger.debug("+ height: " + str(height))
+
+          # compute delta center
           delta_center = [
             -bounds[0] - (bounds[1] - bounds[0]) / 2.0,
             -bounds[2] - (bounds[3] - bounds[2]) / 2.0,
