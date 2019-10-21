@@ -159,6 +159,7 @@ class OpenFile(bpy.types.Operator):
       'doorOrWindow' : bpy.data.collections.new(name="DoorsOrWindows"),
       'pieceOfFurniture' : bpy.data.collections.new(name="Furnitures"),
       'light' : bpy.data.collections.new(name="Lights"),
+      'library' : bpy.data.collections.new(name="Library"),
       } # create home collections
     
     # link collections to scene
@@ -171,6 +172,8 @@ class OpenFile(bpy.types.Operator):
     #
     for collec in self.collections.values() :
       if 'Home' in collec.name :
+        context.scene.collection.children.link(collec)
+      elif 'Library' in collec.name :
         context.scene.collection.children.link(collec)
       else :
         self.collections['home'].children.link(collec)
@@ -218,14 +221,14 @@ class OpenFile(bpy.types.Operator):
     obs = []
 
     for element in xmlRoot:
-      objectName = element.tag
+      objectType = element.tag
 
-      if objectName == 'level':
+      if objectType == 'level':
          levels.append(Level(id=element.get('id'),elev=float(element.get('elevation')),ft=float(element.get('floorThickness'))))
       #
       # furniture group     
       #
-      if objectName == 'furnitureGroup':
+      if objectType == 'furnitureGroup':
 
         groupColl = bpy.data.collections.new(name=element.get('name'))
         collection.children.link(groupColl)
@@ -266,8 +269,9 @@ class OpenFile(bpy.types.Operator):
         logger.info("+==============================================")
         
         logger.info('+ Importing <%s>', name)
+        isTemplate = False
 
-        if self.collections[objectName].objects.find(name) != -1 :
+        if self.collections['library'].objects.find(name) != -1 :
             obj = bpy.data.objects[name].copy()
             obs.append(obj)
             obs[0].location = (0, 0, 0)
@@ -277,7 +281,7 @@ class OpenFile(bpy.types.Operator):
         else:
 
             logger.info('+ loading object <%s>', filename)
-
+            isTemplate = True
             bpy.ops.import_scene.obj(filepath=filename)
             obs = bpy.context.selected_editable_objects[:] 
             obs[0].name=name
@@ -301,12 +305,16 @@ class OpenFile(bpy.types.Operator):
         # Remove object from all collection
         for coll in obs[0].users_collection:
           coll.objects.unlink(obs[0])
+        #
         # Link object to collection
         #
         if 'Home' in collection.name :
-          self.collections[objectName].objects.link(obs[0]) 
+          self.collections[objectType].objects.link(obs[0]) 
         else :
           collection.objects.link(obs[0])
+        # if object is not an instance add it to library
+        if isTemplate is True :
+          self.collections['library'].objects.link(obs[0])
 
         # Set active object
         obs[0].select_set(True)
@@ -482,8 +490,15 @@ class OpenFile(bpy.types.Operator):
                   image=texture.get('image')
                   for material in bpy.context.active_object.data.materials:
                     if mname in material.name: 
-                      img = bpy.data.images.load(os.path.join(self.xml_path,image))
                       
+                      # if image not already loaded
+                      if image not in bpy.data.images :
+                        logger.debug("+ Image loading: " + image)
+                        img = bpy.data.images.load(os.path.join(self.xml_path,image))
+                      else :
+                        logger.debug("+ Image already loaded: " + image)
+                        img = bpy.data.images[image]
+
                       material.use_nodes = True
                       bsdf = material.node_tree.nodes["Principled BSDF"]
                       #tex = bpy.data.textures.new(image, type = 'IMAGE')
@@ -493,7 +508,7 @@ class OpenFile(bpy.types.Operator):
                       material.node_tree.links.new(bsdf.inputs['Base Color'], tex.outputs['Color'])
                 
       
-      if objectName in ('light'):   
+      if objectType in ('light'):   
         owner=bpy.context.active_object    
        
         power= float(element.get('power'))       
@@ -524,7 +539,7 @@ class OpenFile(bpy.types.Operator):
         
     #insert camera  
      # FIXME: Disabled for now
-      if objectName in ('observerCamera') and False: 
+      if objectType in ('observerCamera') and False: 
        if element.get('attribute') == 'observerCamera':
         locX = float(element.get('x'))*scale
         locY = -float(element.get('y'))*scale
